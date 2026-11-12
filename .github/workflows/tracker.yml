@@ -1,0 +1,37 @@
+name: GitHub Projects Automation
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  move-issue-to-done:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check if PR is merged
+        if: github.event.pull_request.merged == true
+        run: echo "PR #${{ github.event.pull_request.number }} was merged."
+
+      - name: Move linked issue to Done
+        if: github.event.pull_request.merged == true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          ISSUE=$(echo "$PR_BODY" | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?) #[0-9]+' | grep -oE '[0-9]+' | head -1)
+          if [ -z "$ISSUE" ]; then
+            echo "No linked issue found in the PR description."
+            exit 0
+          fi
+          gh issue comment "$ISSUE" --repo "${{ github.repository }}" \
+            --body "PR #${{ github.event.pull_request.number }} was merged, so this issue is moved to Done."
+          echo "Issue #$ISSUE marked as Done."
